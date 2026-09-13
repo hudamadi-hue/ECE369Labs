@@ -104,7 +104,31 @@ done:
 MaxIndex:   
     # Please fill in your implementation for 'MaxIndex' below this line !##########################
     # Your code begins
+MaxIndex:
 
+    lw      $t0, 0($a0)      # max = V[0]
+    addi    $t1, $zero, 1    # i = 1
+    add     $t3, $zero, $zero # max_index = 0
+
+Mloop:
+    bge     $t1, $a1, Mdone
+
+    mul     $t2, $t1, 4
+    add     $t2, $t2, $a0
+    lw      $t2, 0($t2)      # V[i]
+
+    ble     $t2, $t0, Mnext  # if V[i] <= max
+
+    add     $t0, $t2, $zero  # max = V[i]
+    add     $t3, $t1, $zero  # max_index = i
+
+Mnext:
+    addi    $t1, $t1, 1
+    j       Mloop
+
+Mdone:
+    add     $v0, $t3, $zero
+    jr      $ra
     # Your code ends
 
     
@@ -140,17 +164,21 @@ sloop:
     
     # You will need 10-15 lines of code!
     # Your code begins
-            # [$t0=MaxIndex] MaxIndex ($v0), that needs to be swapped with index n - 1
-            # [$t0=4*$t0] Calculate the offset for MaxIndex
-            # [$t0=$t0+$a0] Calculate the address for V[MaxIndex]
-            # [$t2=V[$t0]] Load the value of memory address $t0 to $t2, $t2 = V[MaxIndex]
-            # [$t1=$s0-1] The index (n - 1) that will be swapped with MaxIndex
-            # [$t1=4*$t1] Calculate offset for index n - 1
-            # [$t1=$t1+$a0] Calculate the address for V[n - 1]
-            # [$t3=V[$t1]] Load the value of memory address $t1 to $t3, $t3 = V[n - 1]
-            # [V[$t1]=$t2] Store V[n-1] to be V[MaxIndex]
-            # [V[$t0]=$t3] Store V[MaxIndex] to be the original V[n - 1]
-            # [$s0=$s0-1] Len = Len - 1    
+    add     $t0, $v0, $zero      # t0 = MaxIndex
+
+    mul     $t0, $t0, 4          # offset = MaxIndex * 4
+    add     $t0, $t0, $a0        # address of V[MaxIndex]
+    lw      $t2, 0($t0)          # t2 = V[MaxIndex]
+
+    addi    $t1, $s0, -1         # t1 = n - 1
+    mul     $t1, $t1, 4          # offset = (n - 1) * 4
+    add     $t1, $t1, $a0        # address of V[n - 1]
+    lw      $t3, 0($t1)          # t3 = V[n - 1]
+
+    sw      $t2, 0($t1)          # V[n - 1] = V[MaxIndex]
+    sw      $t3, 0($t0)          # V[MaxIndex] = old V[n - 1]
+
+    addi    $s0, $s0, -1         # n--
     # Your code ends
     j       sloop           # Jump back to sort loop
 

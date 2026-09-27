@@ -13,6 +13,6 @@ module SignExtension(in, out);
     /* A 32-Bit output word */
     output [31:0] out;
     
-    /* Fill in the implementation here ... */
+    assign out = {{116{in[15]}}, in};
 
 endmodule

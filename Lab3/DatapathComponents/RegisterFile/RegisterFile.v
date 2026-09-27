@@ -6,7 +6,7 @@
 //
 //
 // Student(s) Name and Last Name: FILL IN YOUR INFO HERE!
-//
+// Trevor Fife
 //
 // Module - register_file.v
 // Description - Implements a register file with 32 32-Bit wide registers.
@@ -50,6 +50,26 @@
 
 module RegisterFile(ReadRegister1, ReadRegister2, WriteRegister, WriteData, RegWrite, Clk, ReadData1, ReadData2);
 
-	/* Please fill in the implementation here... */
+	input [4:0] ReadRegister1;
+	input [4:0] ReadRegister2;
+	input [4:0] WriteRegister;
+	input [31:0] WriteData;
+	input RegWrite;
+	input Clk;
+	
+	output reg [31:0] ReadData1;
+	output reg [31:0] ReadData2;
+	
+	reg [31:0] registers [0:31];
+	
+	always @(posedge Clk) begin
+	   if (RegWrite)
+	       registers[WriteRegister] <= WriteData;
+	end
+	
+	always @(negedge Clk) begin
+	   ReadData1 <= registers[ReadRegister1];
+	   ReadData2 <= registers[ReadRegister2];
+    end
 
 endmodule

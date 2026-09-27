@@ -42,7 +42,52 @@ module RegisterFile_tb();
 
 	initial begin
 	
-    /* Please fill in the implementation here... */
+        // Initialize Inputs
+        ReadRegister1 = 5'd0;
+        ReadRegister2 = 5'd0;
+        WriteRegister = 5'd0;
+        WriteData = 32'd0;
+        RegWrite = 1'b0;
+        
+        // Write 10 into register 1
+        #5;
+        WriteRegister = 5'd1;
+        WriteData = 32'd10;
+        RegWrite = 1'b1;
+        
+        // Wait until after rising edge at 10 ns
+        #10;
+        RegWrite = 1'b0;
+        
+        // Write 20 into register 2
+        #10;
+        WriteRegister = 5'd2;
+        WriteData = 32'd20;
+        RegWrite = 1'b1;
+        
+        // Wait until after rising edge at 30 ns
+        #10;
+        RegWrite = 1'b0;
+        
+        // Select registers 1 and 2 for reading
+        ReadRegister1 = 5'd1;
+        ReadRegister2 = 5'd2;
+        
+        // Wait until falling edge @ 40 ns
+        #10;
+        $display("R1 = %d, R2 = %d", ReadData1, ReadData2);
+        
+        // Try to overwrite register 1 while RegWrite = 0
+        WriteRegister = 5'd1;
+        WriteData = 32'd99;
+        RegWrite = 1'b0;
+        
+        // Another rising and falling edge
+        #20;
+        $display("After RegWrite=0: R1 = %d", ReadData1);
+        
+        #10;
+        $finish;
 	
 	end
 

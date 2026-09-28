@@ -26,16 +26,106 @@
 //   operations needed to support. 
 ////////////////////////////////////////////////////////////////////////////////
 
-module ALU32Bit(ALUControl, A, B, ALUResult, Zero);
+module ALU32Bit(ALUControl, A, B, ALUResult, ALUResultHi, Zero);
 
 	input [3:0] ALUControl; // control bits for ALU operation
                                 // you need to adjust the bitwidth as needed
 	input [31:0] A, B;	    // inputs
 
-	output [31:0] ALUResult;	// answer
-	output Zero;	    // Zero=1 if ALUResult == 0
+	output reg [31:0] ALUResult;	// answer
+	output reg [31:0] ALUResultHi;
+	output reg Zero;	    // Zero=1 if ALUResult == 0
 
-    /* Please fill in the implementation here... */
+        reg [63:0] MultResult;
 
+    always @(*) begin
+
+        // Defaults
+        ALUResult = 32'b0;
+        ALUResultHi = 32'b0;
+        MultResult = 64'b0;
+        Zero = 1'b0;
+
+        case (ALUControl)
+
+            4'b0000: begin               // ADD
+                ALUResult = A + B;
+            end
+
+            4'b0001: begin               // SUB
+                ALUResult = A - B;
+            end
+
+            4'b0010: begin               // AND
+                ALUResult = A & B;
+            end
+
+            4'b0011: begin               // OR
+                ALUResult = A | B;
+            end
+
+            4'b0100: begin               // NOR
+                ALUResult = ~(A | B);
+            end
+
+            4'b0101: begin               // XOR
+                ALUResult = A ^ B;
+            end
+
+            4'b0110: begin               // SLL
+                ALUResult = B << A[4:0];
+            end
+
+            4'b0111: begin               // SRL
+                ALUResult = B >> A[4:0];
+            end
+
+            4'b1000: begin               // SLT
+                ALUResult =
+                    ($signed(A) < $signed(B)) ? 32'd1 : 32'd0;
+            end
+
+            4'b1001: begin               // MUL
+                MultResult = A * B;
+                ALUResult = MultResult[31:0];
+                ALUResultHi = MultResult[63:32];
+            end
+
+            4'b1010: begin               // BGEZ
+                Zero = ($signed(A) >= 0);
+            end
+
+            4'b1011: begin               // BGTZ
+                Zero = ($signed(A) > 0);
+            end
+
+            4'b1100: begin               // BLEZ
+                Zero = ($signed(A) <= 0);
+            end
+
+            4'b1101: begin               // BLTZ
+                Zero = ($signed(A) < 0);
+            end
+
+            4'b1110: begin               // BEQ
+                Zero = (A == B);
+            end
+
+            4'b1111: begin               // BNE
+                Zero = (A != B);
+            end
+
+            default: begin
+                ALUResult = 32'b0;
+                ALUResultHi = 32'b0;
+                Zero = 1'b0;
+            end
+
+        endcase
+    
+        if (ALUControl <= 4'b1001)
+            Zero = (ALUResult == 32'b0);
+        end
+        
 endmodule
 

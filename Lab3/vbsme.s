@@ -1,5 +1,5 @@
 #  Fall 2024
-#  Team Members: Trevor Fife, Zach Scheve, 
+#  Team Members: Trevor Fife, Zach Scheve, Huda Madi
 #  % Effort    :   
 #
 # ECE369A,  
@@ -776,65 +776,230 @@ print_result:
 
 # Begin subroutine
 vbsme:  
-    li      $v0, 0              # reset $v0 and $V1
-    li      $v1, 0
+# Save callee-saved registers and return address
+    addiu   $sp, $sp, -36
+    sw      $ra, 32($sp)
+    sw      $s0, 28($sp)
+    sw      $s1, 24($sp)
+    sw      $s2, 20($sp)
+    sw      $s3, 16($sp)
+    sw      $s4, 12($sp)
+    sw      $s5, 8($sp)
+    sw      $s6, 4($sp)
+    sw      $s7, 0($sp)
 
-    # insert your code here
-    # Task 1:
-    # Inputs:
-    #   $a0 = address of array containing frame/window dimensions
-    #   $a1 = base address of frame
-    #   $a2 = base address of window
-    #
-    # Registers used:
-    #   $s0 = frame rows
-    #   $s1 = frame columns
-    #   $s2 = window rows
-    #   $s3 = window columns
-    #   $s4 = starting address of current frame candidate
-    #   $s5 = calculated SAD
-    #
-    # Output:
-    #   $s5 = SAD for the current candidate
+    # Dimensions
+    lw      $s1, 4($a0)         # frame columns
+    lw      $s2, 8($a0)         # window rows
+    lw      $s3, 12($a0)        # window columns
+    lw      $t0, 0($a0)         # frame rows
 
-    lw      $s0, 0($a0)      # frame rows
-    lw      $s1, 4($a0)      # frame columns
-    lw      $s2, 8($a0)      # window rows
-    lw      $s3, 12($a0)     # window columns
-    move    $s4, $a1         # candidate frame starting address
-   
-    li      $t0, 0           # SAD total
-    li      $t1, 0           # window row index
+    # Search limits: valid top-left coordinates
+    subu    $s5, $t0, $s2       # bottom = frame rows - window rows
+    subu    $s7, $s1, $s3       # right  = frame cols - window cols
+    move    $s4, $zero           # top = 0
+    move    $s6, $zero           # left = 0
 
-    sad_row_loop:
-        beq     $t1, $s2, sad_done   # if row == window rows, SAD is complete
-        li      $t2, 0               # reset window column index
+    li      $s0, 0x7fffffff      # minimum SAD
+    move    $v0, $zero           # best row
+    move    $v1, $zero           # best column
 
-    sad_col_loop:
-        beq     $t2, $s3, sad_next_row   # finished all columns in this row
-        mul     $t3, $t1, $s3       # row * window columns
-        add     $t3, $t3, $t2       # + column
-        sll     $t3, $t3, 2         # word index -> byte offset
-        add     $t4, $a2, $t3       # address of window[row][column]
-        lw      $t5, 0($t4)         # load window value
-        mul     $t6, $t1, $s1       # row * frame columns
-        add     $t6, $t6, $t2       # + column
-        sll     $t6, $t6, 2         # word index -> byte offset
-        add     $t7, $s4, $t6       # address of frame[row][column]
-        lw      $t8, 0($t7)         # load frame value
-        sub     $t9, $t8, $t5       # difference = frame - window
-        bgez    $t9, sad_add         # if difference >= 0, keep it
-        sub     $t9, $zero, $t9      # otherwise make it positive
+spiral_check:
+    slt     $t0, $s5, $s4        # bottom < top?
+    bne     $t0, $zero, vbsme_done
+    nop
+    slt     $t0, $s7, $s6        # right < left?
+    bne     $t0, $zero, vbsme_done
+    nop
 
-    sad_add:
-        add     $t0, $t0, $t9       # SAD += absolute difference
-        addi    $t2, $t2, 1         # move to next window column
-        j       sad_col_loop
+    # Traverse top edge from left to right
+    move    $t8, $s4             # current row
+    move    $t9, $s6             # current column
+spiral_top:
+    slt     $t0, $s7, $t9        # right < current column?
+    bne     $t0, $zero, spiral_top_done
+    nop
+    jal     calculate_sad
+    nop
+    sltu    $t0, $t7, $s0
+    beq     $t0, $zero, spiral_top_next
+    nop
+    move    $s0, $t7
+    move    $v0, $t8
+    move    $v1, $t9
+spiral_top_next:
+    addiu   $t9, $t9, 1
+    j       spiral_top
+    nop
+spiral_top_done:
+    addiu   $s4, $s4, 1          # top++
 
-    sad_next_row:
-        addi    $t1, $t1, 1         # move to next window row
-        j       sad_row_loop
+    # Traverse right edge from top to bottom
+    move    $t8, $s4
+    move    $t9, $s7
+spiral_right:
+    slt     $t0, $s5, $t8
+    bne     $t0, $zero, spiral_right_done
+    nop
+    jal     calculate_sad
+    nop
+    sltu    $t0, $t7, $s0
+    beq     $t0, $zero, spiral_right_next
+    nop
+    move    $s0, $t7
+    move    $v0, $t8
+    move    $v1, $t9
+spiral_right_next:
+    addiu   $t8, $t8, 1
+    j       spiral_right
+    nop
+spiral_right_done:
+    addiu   $s7, $s7, -1         # right--
 
-    sad_done:
-    move    $s5, $t0            # store final SAD for current candidate
-    jr      $ra                 # return to caller
+    # Traverse bottom edge from right to left, if it remains
+    slt     $t0, $s5, $s4
+    bne     $t0, $zero, spiral_skip_bottom
+    nop
+    move    $t8, $s5
+    move    $t9, $s7
+spiral_bottom:
+    slt     $t0, $t9, $s6
+    bne     $t0, $zero, spiral_bottom_done
+    nop
+    jal     calculate_sad
+    nop
+    sltu    $t0, $t7, $s0
+    beq     $t0, $zero, spiral_bottom_next
+    nop
+    move    $s0, $t7
+    move    $v0, $t8
+    move    $v1, $t9
+spiral_bottom_next:
+    addiu   $t9, $t9, -1
+    j       spiral_bottom
+    nop
+spiral_bottom_done:
+    addiu   $s5, $s5, -1         # bottom--
+spiral_skip_bottom:
+
+    # Traverse left edge from bottom to top, if it remains
+    slt     $t0, $s7, $s6
+    bne     $t0, $zero, spiral_skip_left
+    nop
+    move    $t8, $s5
+    move    $t9, $s6
+spiral_left:
+    slt     $t0, $t8, $s4
+    bne     $t0, $zero, spiral_left_done
+    nop
+    jal     calculate_sad
+    nop
+    sltu    $t0, $t7, $s0
+    beq     $t0, $zero, spiral_left_next
+    nop
+    move    $s0, $t7
+    move    $v0, $t8
+    move    $v1, $t9
+spiral_left_next:
+    addiu   $t8, $t8, -1
+    j       spiral_left
+    nop
+spiral_left_done:
+    addiu   $s6, $s6, 1          # left++
+spiral_skip_left:
+    j       spiral_check
+    nop
+
+vbsme_done:
+    lw      $s7, 0($sp)
+    lw      $s6, 4($sp)
+    lw      $s5, 8($sp)
+    lw      $s4, 12($sp)
+    lw      $s3, 16($sp)
+    lw      $s2, 20($sp)
+    lw      $s1, 24($sp)
+    lw      $s0, 28($sp)
+    lw      $ra, 32($sp)
+    addiu   $sp, $sp, 36
+    jr      $ra
+    nop
+
+# calculate_sad
+# Input:  $t8 = candidate row, $t9 = candidate column
+# Uses:   $a1 = frame base, $a2 = window base
+#         $s1 = frame columns, $s2 = window rows, $s3 = window columns
+# Output: $t7 = SAD
+calculate_sad:
+    # Generate address of frame[current row][current column]
+    # using repeated addition, without mult/div/HI/LO.
+    move    $t0, $zero           # row * frame columns
+    move    $t1, $zero           # counter
+sad_row_offset:
+    beq     $t1, $t8, sad_row_offset_done
+    nop
+    addu    $t0, $t0, $s1
+    addiu   $t1, $t1, 1
+    j       sad_row_offset
+    nop
+sad_row_offset_done:
+    addu    $t0, $t0, $t9       # element index
+    sll     $t0, $t0, 2         # byte offset
+    addu    $t0, $a1, $t0       # frame row pointer
+
+    move    $t1, $a2             # window pointer
+    move    $t7, $zero           # SAD accumulator
+    move    $t2, $zero           # window row index
+    sll     $t6, $s1, 2          # frame row stride in bytes
+
+sad_outer:
+    beq     $t2, $s2, sad_done
+    nop
+    move    $t3, $t0             # frame pixel pointer for this row
+    move    $t4, $zero           # window column index
+sad_inner:
+    beq     $t4, $s3, sad_next_row
+    nop
+    lw      $t5, 0($t3)          # frame pixel
+    lw      $t0, 0($t1)          # window pixel
+    subu    $t5, $t5, $t0        # difference
+    bgez    $t5, sad_abs_ready
+    nop
+    subu    $t5, $zero, $t5      # absolute value
+sad_abs_ready:
+    addu    $t7, $t7, $t5
+    addiu   $t3, $t3, 4
+    addiu   $t1, $t1, 4
+    addiu   $t4, $t4, 1
+    j       sad_inner
+    nop
+sad_next_row:
+    # Rebuild this candidate's first-row address, then advance by row stride.
+    # $t0 was used as a pixel temporary, so recover the next frame-row pointer.
+    move    $t0, $zero
+    move    $t4, $zero
+sad_rebuild_row:
+    beq     $t4, $t8, sad_rebuild_done
+    nop
+    addu    $t0, $t0, $s1
+    addiu   $t4, $t4, 1
+    j       sad_rebuild_row
+    nop
+sad_rebuild_done:
+    addu    $t0, $t0, $t9
+    sll     $t0, $t0, 2
+    addu    $t0, $a1, $t0
+    addiu   $t2, $t2, 1
+    move    $t4, $zero
+sad_advance_rows:
+    beq     $t4, $t2, sad_advance_done
+    nop
+    addu    $t0, $t0, $t6
+    addiu   $t4, $t4, 1
+    j       sad_advance_rows
+    nop
+sad_advance_done:
+    j       sad_outer
+    nop
+sad_done:
+    jr      $ra
+    nop
